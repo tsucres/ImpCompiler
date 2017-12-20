@@ -1,0 +1,4 @@
+begin
+  read(a) ;
+  print(a)
+end

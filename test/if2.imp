@@ -1,0 +1,27 @@
+begin
+  a := 10;
+  c := 20;
+
+  read(b);
+
+  if b > a and b < c then
+    success := 0;
+    print(success)
+  else 
+    if b < a then
+      underflow := 1;
+      print(underflow)
+    else 
+      if b > c then
+        overflow := 2;
+        print(overflow)
+
+      else
+        if b = a or b = c then
+          equality := 3;
+          print(equality)
+        endif
+      endif
+    endif
+  endif
+end

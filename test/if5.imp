@@ -1,0 +1,13 @@
+begin
+  a := 10;
+  read(b);
+
+  if b > a then
+    success := 0;
+    print(success)
+  endif;
+
+  ended:=100;
+  print(ended)
+
+end

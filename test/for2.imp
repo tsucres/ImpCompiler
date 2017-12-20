@@ -1,0 +1,7 @@
+begin
+  
+  for a from 4 to 17 do
+    print(a)
+  done 
+
+end

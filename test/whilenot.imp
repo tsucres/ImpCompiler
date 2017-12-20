@@ -1,0 +1,10 @@
+begin
+  a := 10;
+  while not a <= 0 do
+     a := a - 1;
+     print(a)
+  done;
+
+  endend := 1909;
+  print(endend)
+end

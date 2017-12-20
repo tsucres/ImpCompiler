@@ -1,0 +1,6 @@
+begin
+  read(a) ;
+  a := (a+2)*18;
+  a := a - 2;
+  print(a)
+end

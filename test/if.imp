@@ -1,0 +1,22 @@
+begin
+  read(a);
+  if a > 2 and b < b or 2*2 < 2 then
+    read(a)
+  endif ;
+
+  a := 3;
+
+  if a > 2 and b < b or 2*2 < 2 then
+  	print(h)
+  endif ;
+  
+  if a > 2 then
+  	read(h)
+  else 
+    read(g)
+  endif;
+
+  if a > 2 then
+  	print(a)
+  endif
+end

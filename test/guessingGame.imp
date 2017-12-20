@@ -1,0 +1,27 @@
+(* 
+	This is the guessing game: 
+	The user must guess a number chose by the program.
+	To do so, it enters a number, 
+		if it's smaller than the target, the program outputs -1
+		if it's bigger, it outputs 1
+		if it's equal, it shows 0 and terminates
+*)
+begin
+  numberToGuess := 108;
+
+  bigger := 1;
+  smaller := -1;
+  win := 0;
+
+  read(guess);
+  while guess <> numberToGuess do
+  	if guess > numberToGuess then
+      print(smaller)
+  	else
+  	  print(bigger)
+  	endif;
+  	read(guess)
+  done;
+  print(win)
+  
+end

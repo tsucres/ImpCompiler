@@ -1,0 +1,7 @@
+begin
+  
+  for a from 2 by 13 to 10 do
+    print(a)
+  done 
+
+end
