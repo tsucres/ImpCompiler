@@ -3,17 +3,23 @@ import java.util.ArrayList;
 
 import Utils.StringUtils;
 
+/**
+ * Build and produce the IR code for an LLVM basic group made of LLVMInstructions
+ */
 class LLVMBasicGroup implements LLVMCodeGenerator {
 
 	private ArrayList<LLVMCodeGenerator> content = new ArrayList<LLVMCodeGenerator>();
 	/**
-	 * The name of the group. The generated group will start with "name: [list of instruction]"
+	 * The name of the group. The generated group will start with "name: [list of instructions]"
 	 */
 	private String name;
 	
 	public LLVMBasicGroup(String name) {
 		this.name = name;
 	}
+	/**
+	 * @return the LLVM name of the group
+	 */
 	public String getName() {
 		return this.name;
 	}

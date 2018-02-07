@@ -1,0 +1,73 @@
+func testFunc1 with in 
+
+endfunc
+
+func testFunc2 with a in
+endfunc
+func testFunc3 with a in
+return 0
+endfunc
+func testFunc4 with a in
+return 2*2
+endfunc
+func testFunc5 with a in
+return a
+endfunc
+func testFunc6 with a b in
+endfunc
+func testFunc7 with in
+print(2)
+endfunc
+func testFunc8 with a in
+print(a)
+endfunc
+func testFunc9 with a in
+for a from 1 to 5 do
+done
+endfunc
+
+begin
+  call testFunc9(1);
+  a := 2+3-2+3;
+  b := 9%3;
+  print("hello world!\n");
+
+  if a = 0 then
+  endif;
+  if a > 0 and a < 0 then
+  endif;
+  if a > 0 then
+  else
+  endif;
+  if a > 0 then
+  else
+  print(a)
+  endif;
+  if a > 9 then
+  print(a)
+  else
+  endif;
+  if a > 9 then
+  for a from 1 to 10 do
+  done;
+  print(a)
+  endif;
+
+
+  while a = 987578 do
+  done;
+  while a = 987578 do
+  while a = 764567 do
+  done
+  done;
+  while a = 57897676 do
+    if a = 45678 then
+    else
+      for i from 1 to 10 do
+        while a = 5678 do
+          print(a)
+        done
+      done
+    endif
+  done
+end

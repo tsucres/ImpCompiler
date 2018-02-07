@@ -1,0 +1,8 @@
+begin
+  a := 10;
+  while a < 0 do
+     
+  done;
+  print(a)
+
+end

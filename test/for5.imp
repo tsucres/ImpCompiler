@@ -1,9 +1,0 @@
-begin
-  read(start);
-  read(endend);
-  read(bay);
-  for a from start by bay to endend do
-    print(a)
-  done 
-
-end

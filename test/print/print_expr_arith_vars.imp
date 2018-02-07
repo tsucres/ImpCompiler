@@ -1,0 +1,11 @@
+begin
+  a := 8;
+  b := 9;
+  c := 10;
+  print(a+b);
+  print(a*b-c);
+  print("\n");
+  print(a*a-c);
+  print((a+b)*(a-c)*(-1)+10);
+  print("\n")
+end

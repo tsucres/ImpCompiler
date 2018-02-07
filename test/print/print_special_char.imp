@@ -1,0 +1,8 @@
+begin
+  print("
+  Hi there!\nThis is a new line\n
+  \tThis an indented new line!
+  ");
+  print("\n");
+  print("This is \"quoted\"")
+end

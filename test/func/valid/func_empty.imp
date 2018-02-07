@@ -1,0 +1,8 @@
+func firstFunc with a b c in
+  
+endfunc
+begin
+  call firstFunc(1 2 3);
+  a := 2+3-2+3;
+  print(a)
+end

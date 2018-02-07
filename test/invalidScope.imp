@@ -1,0 +1,6 @@
+begin
+a := 1;
+if a > 0 then
+b := 3 endif ;
+print (b)
+end

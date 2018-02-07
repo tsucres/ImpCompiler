@@ -1,0 +1,7 @@
+func firstFunc with a b c in
+  local := 4
+endfunc
+begin
+  call firstFunc(a a a);
+  print(0)
+end

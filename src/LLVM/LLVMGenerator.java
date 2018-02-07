@@ -1,7 +1,10 @@
 package LLVM;
-import java.util.TreeMap;
-import java.util.Map;
-import Lexer.Symbol;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map.Entry;
+
+import Parser.IdentifierTableNode;
 import Parser.SymbolNode;
 import Lexer.LexicalUnit;
 
@@ -13,11 +16,11 @@ import Lexer.LexicalUnit;
 public class LLVMGenerator {
 	
 	/**
-	 * Indicates if there's a call of the printf function if the program 
-	 * and thus if the declaration of the printf function has
+	 * Indicates if there's a call of the printInt function if the program 
+	 * and thus if the declaration of the printInt function has
 	 * to be included in the final LLVM IR code.
 	 */
-	private boolean printUsed = false;
+	private boolean printIntUsed = false;
 	/**
 	 * Indicates if there's a call of the scanf function if the program 
 	 * and thus if the declaration of the scanf function has
@@ -25,6 +28,15 @@ public class LLVMGenerator {
 	 */
 	private boolean readUsed = false;
 	
+	/**
+	 * Indicates if there's a call to the C printf function and thus if 
+	 * its declaration is necessary in the generated LLVM IR code.
+	 */
+	private boolean printfUsed = false;
+	
+	/**
+	 * The program that will be generated.
+	 */
 	private LLVMProgram program = new LLVMProgram();
 	
 	/**
@@ -33,43 +45,113 @@ public class LLVMGenerator {
 	 * @param identifiersTable The list of identifiers detected by the lexer
 	 * @return the LLVM IR code corresponding to the specified AST
 	 */
-	public String generateFromAST(SymbolNode ast, TreeMap<String,Symbol> identifiersTable) {
-		if (ast.getSymbol().getValue().toString() != "<InstList>") {
+	public String generateFromAST(SymbolNode ast, IdentifierTableNode identifiersTable) {
+		if (ast.getSymbol().getValue().toString() != "Start") {
 			return "";
 		}
+		
+		int i = 0;
+		for (i = 0; i < ast.children().size()-1; i++) {
+			SymbolNode funcNode = ast.children().get(i);
+			LLVMFunction func = generateFunc(funcNode, identifiersTable.children().get(i));
 
+			program.addBlock(func);
+		}
+		
+		
 		LLVMFunction main = LLVMFunction.createMain();
 		
 
 		LLVMBasicGroup entryGroup = new LLVMBasicGroup("entry");
-		generateAllocationsForIdTable(identifiersTable, entryGroup);
-		LLVMBasicGroup lastGroup = this.generateInstList(ast, entryGroup, main);
-		lastGroup.addInstruction(LLVMInstruction.createReturnInt("0"));
+		generateAllocationsForIdTable(identifiersTable.children().get(i), entryGroup, new ArrayList<String>());
 		main.addBlock(entryGroup);
+		LLVMBasicGroup lastGroup;
+		if (ast.children().size() > 0) {
+			lastGroup = this.generateInstList(ast.children().get(i), entryGroup, main);
+		} else {
+			lastGroup = entryGroup;
+		}
+		lastGroup.addInstruction(LLVMInstruction.createReturnInt("0"));
+		
 		program.addBlock(main);
 
 		String result = this.generateNecessaryImports();
 		result += this.program.generate();
 		return result;
 	} 
+	
+	/**
+	 * @param astFuncNode the func node from the Imp AST (LexicalUnit = FUNC)
+	 * @param identifiersTable the identifier table (with all its children) for the function.
+	 * @return An LLVMFunction instance capable of producing the LLVM code
+	 */
+	public LLVMFunction generateFunc(SymbolNode astFuncNode, IdentifierTableNode identifiersTable) {
+		LLVMFunction func = new LLVMFunction("i32", "@" + astFuncNode.children().get(0).getSymbol().getValue().toString());
+		LLVMBasicGroup entryGroup = new LLVMBasicGroup("entry");
+		generateAllocationsForIdTable(identifiersTable, entryGroup, new ArrayList<String>()); 
+		func.addBlock(entryGroup);
+		
+		SymbolNode funcParamNode = astFuncNode.children().get(1);
+		for (SymbolNode paramNode: funcParamNode.children()) {
+			func.addParam("%" + paramNode.getSymbol().getValue().toString() + "v", "i32");
+			entryGroup.addInstruction(LLVMInstruction.createIntAssignation("%" + paramNode.getSymbol().getValue().toString(), "%" + paramNode.getSymbol().getValue().toString() + "v"));
+		}
+		
+		SymbolNode funcInNode = astFuncNode.children().get(2);
+		LLVMBasicGroup lastGroup = entryGroup;
+		if (funcInNode.children().size() > 0 && funcInNode.children().get(0).getSymbol().getValue().equals("<InstList>")) {
+			lastGroup = this.generateInstList(funcInNode.children().get(0), entryGroup, func);
+		}
+		String rtnValue = "0";
+		if (astFuncNode.children().size() == 5) {
+			// There's a return stmt
+			if (astFuncNode.children().get(3).children().get(0).getSymbol().getType() == LexicalUnit.STRING) {
+				String strValue = astFuncNode.children().get(3).children().get(0).getSymbol().getValue().toString();
+				func.setRtnType("[" + Integer.toString(strValue.length()+1) + " x i8]");
+				//String strVarName = this.program.addStringLitteral(ast.children().get(0).getSymbol().getValue().toString());
+				//group.addInstruction(LLVMInstruction.createStrPrint(strVarName, ast.children().get(0).getSymbol().getValue().toString().length() + 1));
+			
+				rtnValue = this.generateExprArithm(astFuncNode.children().get(3).children().get(0), lastGroup, func);
+			} else {
+				rtnValue = this.generateExprArithm(astFuncNode.children().get(3).children().get(0), lastGroup, func);
+			}
+			
+		}
+
+		lastGroup.addInstruction(LLVMInstruction.createReturnInt(rtnValue));
+
+		return func;
+	}
 
 	/**
-	 * Add the allcocation instructions for each specified identifier in the specified group.
+	 * Add the allocation instructions for each specified identifier in the specified group.
 	 * @param identifiersTable The list of identifiers detected by the lexer
 	 * @param group The group to add the instructions in.
+	 * @param alreadyDeclared Used to avoid double declaration (same variable could be declared in several scopes)
 	 */
-	private void generateAllocationsForIdTable(TreeMap<String,Symbol> identifiersTable, LLVMBasicGroup group) {
-		for(Map.Entry<String, Symbol> identifier : identifiersTable.entrySet()) {
-			group.addInstruction(LLVMInstruction.createIntAllocation("%" + identifier.getKey()));
+	private void generateAllocationsForIdTable(IdentifierTableNode identifiersTable, LLVMBasicGroup group, List<String> alreadyDeclared) {
+		for(Entry<String, Parser.IdentifierTableEntry> identifier : identifiersTable.getTable().getTable().entrySet()) {
+			if (!alreadyDeclared.contains(identifier.getKey())) {
+				group.addInstruction(LLVMInstruction.createIntAllocation("%" + identifier.getKey()));
+				alreadyDeclared.add(identifier.getKey());
+			}
 		}
-	}
+		for (IdentifierTableNode child: identifiersTable.children()) {
+			generateAllocationsForIdTable(child, group, alreadyDeclared);
+		}
+	} 
+	
 
 	/**
 	 * @return The LLVM IR code if the imports (scanf and printf declarations)
 	 */
 	private String generateNecessaryImports() {
 		String result = "";
-		if (this.printUsed) {
+		if (this.printIntUsed) {
+			result += LLVMUtilsFunctions.PRINTINT;
+			this.printfUsed = true;
+		}
+		if (this.printfUsed) {
 			result += LLVMUtilsFunctions.PRINTF;
 		}
 		if (this.readUsed) {
@@ -77,6 +159,7 @@ public class LLVMGenerator {
 		}
 		return result;
 	}
+
 
 	/**
 	 * @param ast a valid {@literal <InstList> } AST node 
@@ -117,6 +200,8 @@ public class LLVMGenerator {
 			nextGroup = this.generateWhile(ast, group, parentFunction);
 		} else if (ast.getSymbol().getType() == LexicalUnit.FOR) {
 			nextGroup = this.generateFor(ast, group, parentFunction);
+		} else if (ast.getSymbol().getType() == LexicalUnit.CALL) {
+			this.generateFuncCall(ast, group, parentFunction);
 		}
 		else {
 			System.out.println("Unexpected instruction: " + ast.getSymbol().getValue().toString());
@@ -133,8 +218,31 @@ public class LLVMGenerator {
 	 */
 	private void generateAssignation(SymbolNode ast, LLVMBasicGroup group, LLVMFunction parentFunction) {
 		String varName = "%" + ast.children().get(0).getSymbol().getValue().toString();
-		String value = this.generateExprArithm(ast.children().get(1), group, parentFunction);
-		group.addInstruction(LLVMInstruction.createIntAssignation(varName, value));
+		if (ast.children().get(1).getSymbol().getType() == LexicalUnit.CALL) {
+			String value = this.generateFuncCall(ast.children().get(1), group, parentFunction);
+			group.addInstruction(LLVMInstruction.createIntAssignation(varName, value));
+		} else {
+			String value = this.generateExprArithm(ast.children().get(1), group, parentFunction);
+			group.addInstruction(LLVMInstruction.createIntAssignation(varName, value));
+		}
+		
+	}
+	
+	/**
+	 * @param ast
+	 * @param group
+	 * @param parentFunction
+	 * @return the name of the temporary variable where the result produced by the function is stored
+	 */
+	private String generateFuncCall(SymbolNode ast, LLVMBasicGroup group, LLVMFunction parentFunction) {
+		ArrayList<String> params = new ArrayList<String>();
+		
+		for (SymbolNode child: ast.children().get(1).children()) {
+			params.add(this.generateExprArithm(child, group, parentFunction));
+		}
+		String tempVarName = parentFunction.newTempVar();
+		group.addInstruction(LLVMInstruction.createIntFuncCall(tempVarName, ast.children().get(0).getSymbol().getValue().toString(), params));
+		return tempVarName;
 	}
 
 	
@@ -148,26 +256,36 @@ public class LLVMGenerator {
 	 * 			It's the group that to add the next instruction to.
 	 */
 	private LLVMBasicGroup generateIf(SymbolNode ast, LLVMBasicGroup group, LLVMFunction parentFunction) {
-		// generate the group to jump to when the code in the if or the else is executed.
-		LLVMBasicGroup endifGroup = new LLVMBasicGroup(parentFunction.newGroupName("endif"));
-		parentFunction.addBlock(endifGroup);
-
+		
 		// generate the condition in the if
 		String boolVar = this.generateCond(ast.children().get(0), group, parentFunction);
 
 		// Create the group to jump to if the condition is true
 		LLVMBasicGroup ifGroup = new LLVMBasicGroup(parentFunction.newGroupName("if"));
-		this.generateInstList(ast.children().get(1), ifGroup, parentFunction);
-
+		parentFunction.addBlock(ifGroup);
+		LLVMBasicGroup lastIfGroup = ifGroup;
+		if (ast.children().size() > 1 && ast.children().get(1).getSymbol().getValue().equals("<InstList>")) {
+			lastIfGroup = this.generateInstList(ast.children().get(1), ifGroup, parentFunction);
+		}
 		
+
+		// generate the group to jump to when the code in the if or the else is executed.
+		LLVMBasicGroup endifGroup = new LLVMBasicGroup(parentFunction.newGroupName("endif"));
+		
+
+				
 		// Create the jump instruction that goes to the endifGroup
 		LLVMInstruction unconditionnalJump = LLVMInstruction.createUnConditionalJump(endifGroup.getName());
-		ifGroup.addInstruction(unconditionnalJump);
+		lastIfGroup.addInstruction(unconditionnalJump);
 		
 		// Create (and fill) the group to jump to if the condition is false (if there's a else)
 		LLVMBasicGroup elseGroup = null;
 		if (ast.children().size() == 3) {
 			elseGroup = new LLVMBasicGroup(parentFunction.newGroupName("else"));
+			if (elseGroup != null) {
+				parentFunction.addBlock(elseGroup);
+			}
+			
 			LLVMBasicGroup lastEndIfGroup = this.generateInstList(ast.children().get(2), elseGroup, parentFunction);
 			lastEndIfGroup.addInstruction(unconditionnalJump);
 			group.addInstruction(LLVMInstruction.createConditionalJump(boolVar, ifGroup.getName(), elseGroup.getName()));
@@ -175,10 +293,8 @@ public class LLVMGenerator {
 			group.addInstruction(LLVMInstruction.createConditionalJump(boolVar, ifGroup.getName(), endifGroup.getName()));
 		}
 		
-		if (elseGroup != null) {
-			parentFunction.addBlock(elseGroup);
-		}
-		parentFunction.addBlock(ifGroup);
+		parentFunction.addBlock(endifGroup);
+		
 		
 		return endifGroup;
 
@@ -193,22 +309,32 @@ public class LLVMGenerator {
 	 * 			It's the group that to add the next instruction to.
 	 */
 	private LLVMBasicGroup generateWhile(SymbolNode ast, LLVMBasicGroup group, LLVMFunction parentFunction) {
-		// Create the group to jump to when leaving the loop.
-		LLVMBasicGroup doneGroup = new LLVMBasicGroup(parentFunction.newGroupName("done"));
-		parentFunction.addBlock(doneGroup);
-
+		
 		// Create the group evaluating the condition
 		LLVMBasicGroup condWhileGroup = new LLVMBasicGroup(parentFunction.newGroupName("condwhile"));
+		parentFunction.addBlock(condWhileGroup);
 		
 		// Generate the condition
 		String boolVar = this.generateCond(ast.children().get(0), condWhileGroup, parentFunction);
 		
-
 		// Create the group containing the code inside the while
 		LLVMBasicGroup whileGroup = new LLVMBasicGroup(parentFunction.newGroupName("while"));
+		parentFunction.addBlock(whileGroup);
+				
+				
+		// Create the group to jump to when leaving the loop.
+		LLVMBasicGroup doneGroup = new LLVMBasicGroup(parentFunction.newGroupName("done"));
+		
+
+
+		
 		
 		// Generates the instructions inside the loop and retrieve the group it ends in.
-		LLVMBasicGroup endOfWhileGroup = this.generateInstList(ast.children().get(1), whileGroup, parentFunction);
+		LLVMBasicGroup endOfWhileGroup = whileGroup;
+		if (ast.children().size() > 1 && ast.children().get(1).getSymbol().getValue().toString().equals("<InstList>")) {
+			endOfWhileGroup = this.generateInstList(ast.children().get(1), whileGroup, parentFunction);
+			
+		}
 		// At the end of the loop, jump in the condition evaluation code
 		endOfWhileGroup.addInstruction(LLVMInstruction.createUnConditionalJump(condWhileGroup.getName()));
 
@@ -219,9 +345,9 @@ public class LLVMGenerator {
 		// Jumps in the condition for the first time
 		group.addInstruction(LLVMInstruction.createUnConditionalJump(condWhileGroup.getName()));
 		
+		parentFunction.addBlock(doneGroup);
 		
-		parentFunction.addBlock(whileGroup);
-		parentFunction.addBlock(condWhileGroup);
+		
 
 		return doneGroup;
 
@@ -236,10 +362,9 @@ public class LLVMGenerator {
 	 * 			It's the group that to add the next instruction to.
 	 */
 	private LLVMBasicGroup generateFor(SymbolNode ast, LLVMBasicGroup group, LLVMFunction parentFunction) {
-		// Create the bloc to jump to at the end of the loop 
-		LLVMBasicGroup endforGroup = new LLVMBasicGroup(parentFunction.newGroupName("endfor"));
-		parentFunction.addBlock(endforGroup);
-
+		
+		
+		
 		// In the current group, we initialize the var to the "from" and jump inside the incForGroup
 		String fromVar = this.generateExprArithm(ast.children().get(1), group, parentFunction);
 		
@@ -247,14 +372,16 @@ public class LLVMGenerator {
 		// Create the group incrementing the variable and evaluting the condition
 		LLVMBasicGroup incForGroup = new LLVMBasicGroup(parentFunction.newGroupName("incfor"));
 		
-		
+		parentFunction.addBlock(incForGroup);
 
 		// Create the group containing the code to execute in each loop
 		LLVMBasicGroup forGroup = new LLVMBasicGroup(parentFunction.newGroupName("for"));
 		
+		parentFunction.addBlock(forGroup);
 		
+		// Create the bloc to jump to at the end of the loop 
+		LLVMBasicGroup endforGroup = new LLVMBasicGroup(parentFunction.newGroupName("endfor"));
 
-		
 
 		// if (by>=0 and a <= to) or (by<=0 and a>=to) then jmp -> forGroup else jmp endforGroup
 		String byVar = this.generateExprArithm(ast.children().get(2), incForGroup, parentFunction);
@@ -283,7 +410,11 @@ public class LLVMGenerator {
 		incForGroup.addInstruction(LLVMInstruction.createConditionalJump(continueForVar, forGroup.getName(), endforGroup.getName()));
 
 		// Add the instructions in the code group
-		LLVMBasicGroup endOfForGroup = this.generateInstList(ast.children().get(4), forGroup, parentFunction);
+		LLVMBasicGroup endOfForGroup = forGroup;
+		if (ast.children().size() >= 5 && ast.children().get(4).getSymbol().getValue().toString().equals("<InstList>")) {
+			endOfForGroup = this.generateInstList(ast.children().get(4), forGroup, parentFunction);
+			
+		}
 		
 		// Increment the counter at the end of the code in the for
 		String endLoadedCounterVar = parentFunction.newTempVar();
@@ -297,10 +428,8 @@ public class LLVMGenerator {
 		group.addInstruction(LLVMInstruction.createIntAssignation(counterVar, fromVar));
 		group.addInstruction(LLVMInstruction.createUnConditionalJump(incForGroup.getName()));
 		
+		parentFunction.addBlock(endforGroup);
 		
-		parentFunction.addBlock(forGroup);
-		parentFunction.addBlock(incForGroup);
-
 		return endforGroup;
 	}
 
@@ -321,6 +450,8 @@ public class LLVMGenerator {
 			return this.generateMultiplication(ast, group, parentFunction);
 		} else if (ast.getSymbol().getValue().toString().equals("/")) {
 			return this.generateDivision(ast, group, parentFunction);
+		} else if (ast.getSymbol().getValue().toString().equals("%")) {
+			return this.generateRemainer(ast, group, parentFunction);
 		} else if (ast.getSymbol().getValue().toString().equals("+")) {
 			return this.generateAddition(ast, group, parentFunction);
 		} else if (ast.getSymbol().getValue().toString().equals("-")) {
@@ -386,6 +517,9 @@ public class LLVMGenerator {
 	}
 	private String generateSubstraction(SymbolNode ast, LLVMBasicGroup group, LLVMFunction parentFunction) {
 		return this.generateArithmeticOperation(LLVMInstruction.ArithmeticOperation.SUB, ast, group, parentFunction);
+	}
+	private String generateRemainer(SymbolNode ast, LLVMBasicGroup group, LLVMFunction parentFunction) {
+		return this.generateArithmeticOperation(LLVMInstruction.ArithmeticOperation.REM, ast, group, parentFunction);
 	}
 	
 	/**
@@ -479,10 +613,20 @@ public class LLVMGenerator {
 	 * @param parentFunction parentFunction the function containing the entryGroup and in which to add the eventual new ones.
 	 */
 	private void generatePrint(SymbolNode ast, LLVMBasicGroup group, LLVMFunction parentFunction) {
-		this.printUsed = true;
-		String tempVarname = parentFunction.newTempVar();
-		group.addInstruction(LLVMInstruction.createIntLoad(tempVarname, "%" + ast.children().get(0).getSymbol().getValue().toString()));
-		group.addInstruction(LLVMInstruction.createPrint(tempVarname));
+		if (ast.children().get(0).getSymbol().getType() == LexicalUnit.STRING) {
+			this.printfUsed = true;
+			parentFunction.newTempVar();
+			String strVarName = this.program.addStringLitteral(ast.children().get(0).getSymbol().getValue().toString());
+			group.addInstruction(LLVMInstruction.createStrPrint(strVarName, ast.children().get(0).getSymbol().getValue().toString().length() + 1));
+		//} else if (ast.children().get(0).getSymbol().getType() == LexicalUnit.VARNAME
+		//		&& this.ta) {
+			// TODO: current scope
+		} else {
+			this.printIntUsed = true;
+			String tempVarname = generateExprArithm(ast.children().get(0), group, parentFunction);
+			group.addInstruction(LLVMInstruction.createIntPrint(tempVarname));
+		}
+		
 	}
 	/**
 	 * @param ast a valid AST node with the symbol of type READ in it

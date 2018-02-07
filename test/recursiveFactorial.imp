@@ -1,0 +1,25 @@
+(* 
+  Simple recursive function that calculates 
+  the factorial of a positive integer 
+*)
+func recursFactorial with n in
+  rtnValue := 1;
+  if n <> 0 then
+    recurs := call recursFactorial(n-1);
+    rtnValue := n*recurs
+   endif
+   return rtnValue
+endfunc
+begin
+  print("This program calculate the factorial of the number you specify using a recursive algorithm.\n");
+  print("It only works for numbers below 13 (since 13! > 2**32)\n");
+  print("Number: ");
+  n := 0;
+  read(n);
+  fact := call recursFactorial(n);
+  print("The factorial of ");
+  print(n);
+  print(" is: ");
+  print(fact);
+  print("\n")
+end

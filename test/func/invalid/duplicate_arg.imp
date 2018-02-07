@@ -1,0 +1,6 @@
+func firstFunc with a a c in
+  local := 4
+endfunc
+begin
+  print(0)
+end

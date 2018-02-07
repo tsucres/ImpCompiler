@@ -1,0 +1,10 @@
+func firstFunc with a b c in
+  func invalidNestedFunc with i in
+    print(i)
+  endfunc
+  print(c)
+endfunc
+begin
+  a := 2+3-2+3;
+  print(a)
+end

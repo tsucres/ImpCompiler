@@ -1,0 +1,4 @@
+begin
+  a := "Hello world!";
+  print(a); print("\n")
+end

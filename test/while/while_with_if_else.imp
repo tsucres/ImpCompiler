@@ -1,0 +1,13 @@
+begin
+  a := 100;
+  while a > 0 do
+    if a % 2 = 0 then
+      print(a)
+    else
+      a := a - 4
+    endif;
+    a := a - 1
+  done;
+  endend := 1900009;
+  print(endend)
+end

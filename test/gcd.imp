@@ -1,0 +1,29 @@
+func gcd with x y in
+  rtnValue := 0;
+  if y = 0 then
+    rtnValue := x
+  else
+    rtnValue := call gcd(y x%y)
+  endif
+  return rtnValue
+endfunc
+begin
+print("\nThis program will calculate the gcd of the two numbers you specify using a recursive function.\n");
+a := 0;
+b := 0;
+
+print("First number: ");
+read(a);
+print("\nSecond number: ");
+read(b);
+
+result := call gcd(a b);
+print("\nThe gcd of ");
+print(a);
+print(" and ");
+print(b);
+print(" is: ");
+print(result);
+print("\n")
+
+end

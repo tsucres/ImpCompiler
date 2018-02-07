@@ -1,0 +1,16 @@
+begin
+  b := 0;
+  a := 3;
+  h := 0;
+  
+  if a > 2 then
+  	read(h)
+  (*else 
+    g := 0;
+    read(g)*)
+  endif;
+
+  if a > 2 then
+  	print(a)
+  endif
+end

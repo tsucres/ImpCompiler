@@ -1,0 +1,21 @@
+func itFactorial with n in
+  tempTotal := 1;
+  while n <> 0 do
+    tempTotal := tempTotal * n;
+    n := n - 1
+  done
+  return tempTotal
+endfunc
+begin
+  print("This program calculate the factorial of the number you specify using an iterative algorithm.\n");
+  print("It only works for numbers below 13 (since 13! > 2**32)\n");
+  print("Number: ");
+  n := 0;
+  read(n);
+  fact := call itFactorial(n);
+  print("The factorial of ");
+  print(n);
+  print(" is: ");
+  print(fact);
+  print("\n")
+end

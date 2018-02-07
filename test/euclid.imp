@@ -1,4 +1,6 @@
 begin
+  a := 0;
+  b := 0;
   read(a) ;
   read(b) ;
   while b <> 0 do

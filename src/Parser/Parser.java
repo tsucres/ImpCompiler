@@ -1,11 +1,10 @@
 package Parser;
 import java.util.ArrayList;
 
-import TreePrinter.TreePrinter;
-
 import Lexer.LexicalUnit;
 import Lexer.Symbol;
 
+// TODO: the production rules aren't correct since the addition of strings and functions
 /**
  * A static class giving names to the construction rule ids.
  */
@@ -77,8 +76,14 @@ public class Parser {
     private SymbolNode parserTree = null;
     /** The resulting derivation sequence */
     private ArrayList<Integer> derivation = new ArrayList<Integer>();
+    
+    private IdentifierTableNode identifierTablesTree = IdentifierTableNode.withEmptyTable();
+    public IdentifierTableNode getIdentifierTablesTree() {
+		return identifierTablesTree;
+	}
 
-    /**
+
+	/**
      * @return The resulting parse tree
      */
     public SymbolNode getTree() {
@@ -92,11 +97,30 @@ public class Parser {
      */
     public Parser(ArrayList<Symbol> symbols) {
         this.symbols = symbols;
-        this.parserTree = constrProgram();
-        System.out.println("Done.\n\n");
-        System.out.print(TreePrinter.toString(this.parserTree));
+        this.parserTree = new SymbolNode(new Symbol(null, "<S>"));
+        Symbol next = getNextSymbol();
+        while (next.getType() == LexicalUnit.FUNC) {
+        		this.parserTree.addChild(constrFunc());
+        		next = getNextSymbol();
+        }
+        this.parserTree.addChild(constrProgram());
+        
+        // once the parser tree is built, we determine the types of 
+        // all the variables that could not be trivially determined before.
+        this.completeIdTableWithTypes(this.parserTree);
     }
-
+    
+    private void completeIdTableWithTypes(SymbolNode parserTree) {
+    		// TODO
+    		/*for (SymbolNode child: parserTree.children()) {
+    			if (child.getSymbol().getType() == LexicalUnit.RETURN) {
+    				
+    			} else if (child.getSymbol().getValue().equals("<FuncCall>")) {
+    				
+    			}
+    			completeIdTableWithTypes(child);
+    		}*/
+    }
     /**
      * Add the specified rule the derivation path.
      * @param ruleId the id of the rule to add in the derivation sequence.
@@ -128,7 +152,150 @@ public class Parser {
         if (currentSym.getType() != lexUnit) {
             unexpectedSymbolError(currentSym, lexUnit);
         }
+        
+        this.checkForUndeclaredVarUsage(currentSym);
+        this.updateIdTable(currentSym);
         return currentSym;
+    }
+    
+    /**
+     * Change the current scope (create new idTables if necessary) according to the specified symbol.
+     * @param sym the symbol telling how the scope should be affected.
+     */
+    private void updateIdTable(Symbol sym) {
+    		int scopeChange = this.getScopeForLexUnit(sym.getType());
+    		switch (scopeChange) {
+    			case 1:
+    				// Create a new IdTable and add it as a child of the current one.
+    				IdentifierTableNode currentScope = IdentifierTableNode.withEmptyTable();
+    				this.identifierTablesTree.addChild(currentScope);
+    				this.identifierTablesTree = currentScope;
+    				break;
+    			case 2:
+    				// Create a new IdTable and add it as a child of the parent one
+    				IdentifierTableNode currentScope2 = IdentifierTableNode.withEmptyTable();
+    				IdentifierTableNode parentScope = this.identifierTablesTree.getParent();
+    				parentScope.addChild(currentScope2);
+    				this.identifierTablesTree = currentScope2;
+    				break;
+    			case -1:
+    				// Change the current IdTable to the parent of the current one
+    				this.identifierTablesTree = this.identifierTablesTree.getParent();
+    				break;
+    			case -2:
+    				this.identifierTablesTree = this.identifierTablesTree.getParent().getParent();
+    			default:
+    				break;
+    		}
+    }
+    
+    /**
+     * Cheks in the current scope (current idTable and all its parents) if a variable is declared.
+     * @param sym the symbol (of type VARNAME) you want to check the existance
+     * @return Boolean indicating if the variable is already declared.
+     */
+    private boolean isVarnameDeclaredInCurrentScope(Symbol sym) {
+    		if (sym.getType() == LexicalUnit.VARNAME) {
+    			IdentifierTableNode parentNode = this.identifierTablesTree;
+    			while (parentNode != null) {
+    				if (parentNode.getTable().contains(sym)) {
+    					return true;
+    				}
+    				parentNode = parentNode.getParent();
+    			}
+    		}
+    		return false;
+    }
+    
+    /**
+     * Detect uses of undeclared variable and add the new (valid) declaration in the current idTable.
+     * Quits the program with an error if there's an undefined variable.
+     * @param sym the mast matched symbol
+     */
+    private void checkForUndeclaredVarUsage(Symbol sym) {
+    		if (sym.getType() == LexicalUnit.VARNAME) {
+    			if (!(this.isVarnameDeclaredInCurrentScope(sym))) {
+    				Symbol next = this.getNextSymbol();
+    				if (next.getType() == LexicalUnit.ASSIGN || // before assignation
+    						next.getType() == LexicalUnit.VARNAME || // the parameters in the function
+    						next.getType() == LexicalUnit.IN) { // the parameters in the function
+    					// Add the variable in the current IdTable
+    					this.identifierTablesTree.addIdentifier(sym, IdentifierType.UNKNOWN);
+    				}
+    				else if (next.getType() == LexicalUnit.FROM) { // in a for loop
+    					this.identifierTablesTree.addIdentifier(sym, IdentifierType.INT);
+    				} else if (next.getType() == LexicalUnit.WITH) {  // the name of a function
+    					this.identifierTablesTree.addIdentifier(sym, IdentifierType.FUNC(IdentifierType.UNKNOWN));
+    				}
+    				else {
+    					int line = sym.getLine();
+    					int col = sym.getColumn();
+    					String value = sym.getValue().toString();
+    					error(String.format("Error: variable %s was used before initialisation. Line %d col %d", value, line, col));
+    				}
+    			}
+    		}
+    }
+    
+    private void setVariableType(Symbol sym, IdentifierType type) {
+    		if (sym.getType() == LexicalUnit.VARNAME) {
+			IdentifierTableNode parentNode = this.identifierTablesTree;
+			while (parentNode != null) {
+				if (parentNode.getTable().contains(sym)) {
+					if (	parentNode.getTable().getTypeForSymbol(sym).equalsOrUnknown(type, true)
+							) {
+						IdentifierTable t = parentNode.getTable();
+						t.setTypeForSymbol(sym, type);
+						parentNode.setTable(t);
+					} else {
+						error(String.format("Type of symbol %s is ambiguous.", sym.getValue()));
+					}
+					
+				}
+				parentNode = parentNode.getParent();
+			}
+		}
+    }
+    
+    private IdentifierType getVariableType(Symbol sym) {
+    		if (sym.getType() == LexicalUnit.VARNAME) {
+			IdentifierTableNode parentNode = this.identifierTablesTree;
+			while (parentNode != null) {
+				if (parentNode.getTable().contains(sym)) {
+					return parentNode.getTable().getTypeForSymbol(sym);
+				}
+				parentNode = parentNode.getParent();
+			}
+		}
+    		return null;
+    }
+    
+    /**
+     * @param lexicalUnit the lexicalUnit to describe
+     * @return an int representing how the specified LexicalUnit affects the scope.
+     */
+    private int getScopeForLexUnit(LexicalUnit lexicalUnit) {
+    		switch (lexicalUnit) {
+			case DO:
+			case THEN:
+			case FOR:
+			case WHILE:
+			case WITH:
+			case IN:
+			case BEGIN:
+				return 1; // New child scope
+			case ELSE:
+				return 2; // New scope on the same level
+			case DONE: // before a DONE there's a WHILE/FOR and a DO (so there are 2 chilren created). This is so that variable can be initialised in "For x from"
+			case ENDFUNC:
+				return -2; // Go back to the "grandparent" scope
+			case ENDIF:
+			case END:
+				return -1; // Go back to the parent scope
+
+			default:
+				return 0; // Doesn't change the scope
+		}
     }
     /**
      * @return the first non-consumed symbol.
@@ -160,20 +327,22 @@ public class Parser {
         System.out.println(error);
         System.exit(1);
     }
-
+    
+    
     private SymbolNode constrProgram() {
-        SymbolNode currentTreeLevel = new SymbolNode(new Symbol(null, "<S>"));
+        SymbolNode currentTreeLevel = new SymbolNode(new Symbol(null, "<Program>"));
         Symbol beginSymbol = match(LexicalUnit.BEGIN);
         currentTreeLevel.addChild(new SymbolNode(beginSymbol));
         deriv(ProductionRules.PROGRAM);
-        SymbolNode codeTree = constrCode();
-        if (codeTree != null) {
-            currentTreeLevel.addChild(codeTree);
+        SymbolNode bodyTree = constrCode();
+        if (bodyTree != null) {
+            currentTreeLevel.addChild(bodyTree);
         }
         Symbol endSymbol = match(LexicalUnit.END);
         currentTreeLevel.addChild(new SymbolNode(endSymbol));
         return currentTreeLevel;
     }
+    
     private SymbolNode constrCode() {
         Symbol next = getNextSymbol();
         switch (next.getType()) {
@@ -183,6 +352,7 @@ public class Parser {
             case FOR:
             case PRINT:
             case READ:
+            case CALL:
                 deriv(ProductionRules.CODE_INSTLIST);
                 SymbolNode currentTreeLevel = new SymbolNode(new Symbol(null, "<Code>"));
                 currentTreeLevel.addChild(constrInstList());
@@ -251,12 +421,76 @@ public class Parser {
                 deriv(ProductionRules.INSTRUCTION_READ);
                 currentTreeLevel.addChild(constrRead());
                 break;
-
+            case CALL:
+            		currentTreeLevel.addChild(constrFuncCall());
+            		break;
             default:
                 unexpectedSymbolError(next, null);
         }
         return currentTreeLevel;
 
+    }
+    
+    private SymbolNode constrFunc() {
+    		SymbolNode currentTreeLevel = new SymbolNode(new Symbol(null, "<Func>"));
+    		Symbol funcSym = match(LexicalUnit.FUNC);
+        currentTreeLevel.addChild(new SymbolNode(funcSym));
+        Symbol varSym = match(LexicalUnit.VARNAME);
+        // TODO: check for function redeclaration
+        currentTreeLevel.addChild(new SymbolNode(varSym));
+        Symbol withSym = match(LexicalUnit.WITH);
+        currentTreeLevel.addChild(new SymbolNode(withSym));
+        currentTreeLevel.addChild(constrFuncSuffix());
+        
+    		return currentTreeLevel;
+    }
+    private SymbolNode constrFuncSuffix() {
+    		Symbol next = getNextSymbol();
+        SymbolNode currentTreeLevel = new SymbolNode(new Symbol(null, "<FuncSuffix>"));
+        if (next.getType() == LexicalUnit.IN) {
+            //deriv(ProductionRules.FUNCSUFFIX_RP);
+            Symbol rpSym = match(LexicalUnit.IN);
+            currentTreeLevel.addChild(new SymbolNode(rpSym));
+            SymbolNode codeTree = constrCode();
+            if (codeTree != null) {
+                currentTreeLevel.addChild(codeTree);
+            }
+            currentTreeLevel.addChild(constrReturnStmt());
+        } else {
+            //deriv(ProductionRules.FUNCSUFFIX_VN);
+        		Symbol varSym =	getNextSymbol();
+        		
+        		if (this.identifierTablesTree.getTable().contains(varSym)) {
+        			error(String.format("Duplicate variable name \"%s\". Line %d col %d.", 
+        					varSym.getValue().toString(), varSym.getLine(), varSym.getColumn()));
+        		}
+        		varSym = match(LexicalUnit.VARNAME);
+            currentTreeLevel.addChild(new SymbolNode(varSym));
+            currentTreeLevel.addChild(constrFuncSuffix());
+        }
+        return currentTreeLevel;
+    }
+    
+    private SymbolNode constrReturnStmt() {
+    		Symbol next = getNextSymbol();
+    		SymbolNode currentTreeLevel = new SymbolNode(new Symbol(null, "<ReturnStmt>"));
+    		if (next.getType() == LexicalUnit.RETURN) {
+    			Symbol returnSym = match(LexicalUnit.RETURN);
+            currentTreeLevel.addChild(new SymbolNode(returnSym));
+            next = getNextSymbol();
+            if (next.getType() == LexicalUnit.STRING) {
+            		currentTreeLevel.addChild(new SymbolNode(match(LexicalUnit.STRING)));
+            } else {
+            		currentTreeLevel.addChild(constrExprArith());
+            }
+            
+                
+    		} 
+    		Symbol endfuncSym = match(LexicalUnit.ENDFUNC);
+        currentTreeLevel.addChild(new SymbolNode(endfuncSym));
+    		
+    		return currentTreeLevel;
+    			
     }
     private SymbolNode constrAssign() {
         deriv(ProductionRules.ASSIGN);
@@ -265,7 +499,34 @@ public class Parser {
         currentTreeLevel.addChild(new SymbolNode(varSym));
         Symbol assignSym = match(LexicalUnit.ASSIGN);
         currentTreeLevel.addChild(new SymbolNode(assignSym));
-        currentTreeLevel.addChild(constrExprArith());
+        SymbolNode assignSuffixNode = constrAssignSuffix();
+        if (assignSuffixNode.children().get(0).getSymbol().getType() == LexicalUnit.STRING) {
+        		setVariableType(varSym, IdentifierType.STR);
+        } else if (assignSuffixNode.children().get(0).getSymbol().getValue().equals("<ExprArith>")) {
+        		setVariableType(varSym, IdentifierType.INT);
+        } else if (assignSuffixNode.children().get(0).getSymbol().getValue().equals("<FuncCall>")) {
+        		//SymbolNode astFuncCall = assignSuffixNode.children().get(0);
+        		setVariableType(varSym, IdentifierType.INT);
+        		//IdentifierType funcRtnType = this.getVariableType(astFuncCall.children().get(0).getSymbol()).getSubTypeAtIndex(0);
+        		//setVariableType(varSym, funcRtnType);
+        		// TODO
+        }
+        currentTreeLevel.addChild(assignSuffixNode);
+        return currentTreeLevel;
+    }
+    private SymbolNode constrAssignSuffix() {
+    		//deriv(ProductionRules.ASSIGNSUFFIX);
+        SymbolNode currentTreeLevel = new SymbolNode(new Symbol(null, "<AssignSuffix>"));
+        Symbol next = getNextSymbol();
+        
+        if (next.getType() == LexicalUnit.STRING) {
+        		Symbol strSym = match(LexicalUnit.STRING);
+        		currentTreeLevel.addChild(new SymbolNode(strSym));
+        } else if (next.getType() == LexicalUnit.CALL) {
+        		currentTreeLevel.addChild(constrFuncCall());
+        } else {
+        		currentTreeLevel.addChild(constrExprArith());
+        }
         return currentTreeLevel;
     }
     private SymbolNode constrExprArith() {
@@ -351,7 +612,17 @@ public class Parser {
                 currentTreeLevel.addChild(p2Tree);
             }
             return currentTreeLevel; 
-        } else { // epsilon
+        } else if (next.getType() == LexicalUnit.REM) {
+            //deriv(ProductionRules.P2_REM);
+            Symbol remSym = match(LexicalUnit.REM);
+            currentTreeLevel.addChild(new SymbolNode(remSym));
+            currentTreeLevel.addChild(constrAtom());
+            SymbolNode p2Tree = constrP2();
+            if (p2Tree != null) {
+                currentTreeLevel.addChild(p2Tree);
+            }
+            return currentTreeLevel; 
+        }else { // epsilon
             deriv(ProductionRules.P2_EPSILON);
             return null;
         } 
@@ -615,12 +886,30 @@ public class Parser {
         currentTreeLevel.addChild(new SymbolNode(printSym));
         Symbol lpSym = match(LexicalUnit.LPAREN);
         currentTreeLevel.addChild(new SymbolNode(lpSym));
-        Symbol varSym = match(LexicalUnit.VARNAME);
-        currentTreeLevel.addChild(new SymbolNode(varSym));
-        Symbol rpSym = match(LexicalUnit.RPAREN);
-        currentTreeLevel.addChild(new SymbolNode(rpSym));
-
+        
+        currentTreeLevel.addChild(constrPrintSuffix());
         return currentTreeLevel;
+    }
+    
+    private SymbolNode constrPrintSuffix() {
+    		//deriv(ProductionRules.PRINTSUFFIX);
+    		SymbolNode currentTreeLevel = new SymbolNode( new Symbol(null, "<PrintSuffix>"));
+    		Symbol next = getNextSymbol();
+    		
+    		if (next.getType() == LexicalUnit.STRING) {
+    			//deriv(ProductionRules.PRINTSUFFIX_STR);
+    			Symbol varSym = match(LexicalUnit.STRING);
+            currentTreeLevel.addChild(new SymbolNode(varSym));
+           
+    		} else {
+    			//deriv(ProductionRules.PRINTSUFFIX_VN);
+    			currentTreeLevel.addChild(constrExprArith());
+    		}
+    		Symbol rpSym = match(LexicalUnit.RPAREN);
+        currentTreeLevel.addChild(new SymbolNode(rpSym));
+    			
+    		
+    		return currentTreeLevel;
     }
     private SymbolNode constrRead() {
         deriv(ProductionRules.READ);
@@ -634,6 +923,47 @@ public class Parser {
         Symbol rpSym =match(LexicalUnit.RPAREN);
         currentTreeLevel.addChild(new SymbolNode(rpSym));
 
+        return currentTreeLevel;
+    }
+    
+    
+    private SymbolNode constrFuncCall() {
+    		SymbolNode currentTreeLevel = new SymbolNode(new Symbol(null, "<FuncCall>"));
+    		Symbol callSym = match(LexicalUnit.CALL);
+        currentTreeLevel.addChild(new SymbolNode(callSym));
+        Symbol varSym = match(LexicalUnit.VARNAME);
+        currentTreeLevel.addChild(new SymbolNode(varSym));
+        Symbol lpSym = match(LexicalUnit.LPAREN);
+        currentTreeLevel.addChild(new SymbolNode(lpSym));
+        currentTreeLevel.addChild(constrFuncCallSuffix(varSym));
+        return currentTreeLevel;
+    }
+    
+    /**
+     * @param func a Symbol of type VARNAME
+     * @return
+     */
+    private SymbolNode constrFuncCallSuffix(Symbol func) {
+    		Symbol next = getNextSymbol();
+        SymbolNode currentTreeLevel = new SymbolNode(new Symbol(null, "<FuncCallSuffix>"));
+        if (next.getType() == LexicalUnit.RPAREN) {
+            Symbol rpSym = match(LexicalUnit.RPAREN);
+            currentTreeLevel.addChild(new SymbolNode(rpSym));
+        } else {
+        		SymbolNode astFuncParamExprArith;
+        		if (next.getType() == LexicalUnit.STRING) {
+        			astFuncParamExprArith = new SymbolNode(match(LexicalUnit.STRING));
+        		} else {
+        			astFuncParamExprArith = constrExprArith();
+        		}
+        		
+            currentTreeLevel.addChild(astFuncParamExprArith);
+            // TODO: support Strings
+           // IdentifierType funcType = getVariableType(func);
+            //funcType.set
+            //this.setVariableType(func, type);
+            currentTreeLevel.addChild(constrFuncCallSuffix(func));
+        }
         return currentTreeLevel;
     }
 

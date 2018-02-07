@@ -1,0 +1,7 @@
+begin
+
+  for a from 1 by 2 to 10 do
+  	print(a)
+  done
+  
+end

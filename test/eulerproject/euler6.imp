@@ -1,0 +1,8 @@
+begin
+  limit := 100;
+  sum := limit*(limit + 1)/2;
+  sumSq := (2*limit + 1)*(limit + 1)*limit/6 ;
+  print("Result : ");
+  print(sum*sum - sumSq);
+  print("\nExpected result: 25164150\n")
+end

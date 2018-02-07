@@ -1,0 +1,4 @@
+begin
+  fact := 8;
+  print(fact)
+end

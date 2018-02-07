@@ -20,6 +20,8 @@ import java.util.ArrayList;
 		// System.out.println(sym.toString()); 
 		return sym; 
 	}
+	
+	StringBuffer string = new StringBuffer();
 %}
 
 
@@ -51,11 +53,12 @@ AlphaNumeric	= {Alpha}|{Numeric}
 Space			= "\t" | " "
 EndOfLine		= "\r"?"\n"
 VarName			= {Alpha}{AlphaNumeric}*
-// Number			= -?([0-9]+)
 BadInteger     = (0[0-9]+)
 Integer        = ([1-9][0-9]*)|0
 
+
 %state COMMENT
+%state STRING
 
 %%// Identification of tokens
 
@@ -93,6 +96,9 @@ Integer        = ([1-9][0-9]*)|0
 	}
 	"/" { 
 		return symbol(LexicalUnit.DIVIDE,yyline, yycolumn, yytext() ); 
+	}
+	"%" { 
+		return symbol(LexicalUnit.REM,yyline, yycolumn, yytext() ); 
 	}
 
 	"(" { 
@@ -169,7 +175,27 @@ Integer        = ([1-9][0-9]*)|0
 	"from" { 
 		return symbol(LexicalUnit.FROM, yyline, yycolumn, yytext() ); 
 	}
-
+	
+	
+	// Functions
+	"func" {
+		return symbol(LexicalUnit.FUNC,yyline, yycolumn, yytext() ); 
+	}
+	"endfunc" {
+		return symbol(LexicalUnit.ENDFUNC,yyline, yycolumn, yytext() ); 
+	}
+	"with" { 
+		return symbol(LexicalUnit.WITH, yyline, yycolumn, yytext() ); 
+	}
+	"in" {
+		return symbol(LexicalUnit.IN, yyline, yycolumn, yytext() ); 
+	}
+	"return" {
+		return symbol(LexicalUnit.RETURN, yyline, yycolumn, yytext() ); 
+	}
+	"call" {
+		return symbol(LexicalUnit.CALL, yyline, yycolumn, yytext() ); 
+	}
 
 	// Print - Read
 	"print" { 
@@ -188,10 +214,12 @@ Integer        = ([1-9][0-9]*)|0
 		return sym;
 	}
 	
-	// Number
-	// {Number} {
-	//	return symbol(LexicalUnit.NUMBER, yyline, yycolumn, yytext() ); 
-	// }
+	// String
+	\" { 
+		string.setLength(0); yybegin(STRING); 
+	}
+	
+	
 	{BadInteger} {
 		System.out.println("Warning: numbers with leading zeros are deprecated."); 
 		return symbol(LexicalUnit.NUMBER, yyline, yycolumn, new Integer(yytext()));
@@ -207,6 +235,19 @@ Integer        = ([1-9][0-9]*)|0
 <COMMENT> {
 	"*)" { yybegin(YYINITIAL); }
 	. {}
+}
+
+<STRING> {
+	\"                             { yybegin(YYINITIAL); 
+                                       return symbol(LexicalUnit.STRING, yyline, yycolumn,
+                                       string.toString()); }
+    [^\n\r\"\\]+                   { string.append( yytext() ); }
+    \\t                            { string.append('\t'); }
+    \\n                            { string.append('\n'); }
+
+    \\r                            { string.append('\r'); }
+    \\\"                           { string.append('\"'); }
+    \\                             { string.append('\\'); }
 }
 
 

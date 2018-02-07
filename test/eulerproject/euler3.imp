@@ -1,0 +1,29 @@
+(*
+  Find the largest prime factor of a composite number.
+*)
+begin
+  n := 436729935;
+  lastFactor := 1;
+  if n%2 = 0 then
+    n := n/2;
+    lastFactor := 2;
+    while n % 2 = 0 do
+      n := n / 2
+    done
+  else
+    factor := 3;
+    while n>1 do
+      if n % factor = 0 then
+        n := n / factor;
+        lastFactor := factor;
+        while n % factor = 0 do
+          n := n / factor
+        done
+      endif;
+      factor := factor + 2
+    done
+  endif;
+  print("Result: ");
+  print(lastFactor);
+  print("\n")
+end

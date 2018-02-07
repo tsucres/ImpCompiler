@@ -1,6 +1,7 @@
 package AST;
 import Lexer.Symbol;
 import Parser.SymbolNode;
+
 import Lexer.LexicalUnit;
 
 /**
@@ -57,13 +58,15 @@ public class AST {
 			System.out.println("The parser tree should start with <S>");
 			return;
 		}
-		if (tree.children().size() != 3) {
-			System.out.println("The <S> symbol should have 3 children in the parser tree.");
-			return;
+		this.astree = new SymbolNode(new Symbol(null, "Start"));
+		int i = 0;
+		for (i = 0; i < tree.children().size()-1; i++) {
+			this.astree.addChild(this.parseFunc(tree.children().get(i)));
 		}
-		this.parseBegin(tree.children().get(0));
-		this.astree = this.parseCode(tree.children().get(1));
-		this.parseEnd(tree.children().get(2));
+		SymbolNode programNode = tree.children().get(i);
+		this.parseBegin(programNode.children().get(0));
+		this.astree.addChild(this.parseCode(programNode.children().get(1)));
+		this.parseEnd(programNode.children().get(2));
 
 	} 
 	
@@ -75,7 +78,15 @@ public class AST {
 	 */
 	private void checkTypeOfNode(SymbolNode node, LexicalUnit expectedType) throws ASTException {
 		if (node.getSymbol().getType() != expectedType) {
-			throw new ASTException(String.format("type Error")); // TODO: explicit error
+			String type = "null";
+			String expectedTypeStr = "null";
+			if (node.getSymbol().getType() != null) {
+				type = node.getSymbol().getType().toString();
+			}
+			if (expectedType != null) {
+				expectedTypeStr = expectedType.toString();
+			}
+			throw new ASTException(String.format("type Error: %s found, %s expected", type, expectedTypeStr)); // TODO: explicit error
 		}
 	}
 	
@@ -112,6 +123,8 @@ public class AST {
 		}
 	}
 	
+	
+	
 	/**
 	 * @param codeNode a SymbolNode with the value "{@literal <Code> }"
 	 * @throws ASTException if the specified node hasn't the expected value.
@@ -144,7 +157,6 @@ public class AST {
 	private SymbolNode parseInstListSuffix(SymbolNode instListSuffixNode, SymbolNode parentInstList) throws ASTException {
 		this.checkTypeOfNode(instListSuffixNode, null);
 		this.checkValueOfNode(instListSuffixNode, "<InstListSuffix>");
-		System.out.println("cousscou");
 		SymbolNode childInstListNode = instListSuffixNode.children().get(1);
 		parentInstList.addChild(this.parseInstruction(childInstListNode.children().get(0)));
 		if (childInstListNode.children().size() == 2) {
@@ -160,6 +172,7 @@ public class AST {
 		if (instructionNode.children().size() != 1) {
 			throw new ASTException("Error: <Instruction> should have exactly one child.");
 		}
+		
 		if (instructionNode.children().get(0).getSymbol().getValue().toString().equals("<Assign>")) {
 			return this.parseAssign(instructionNode.children().get(0));
 		} else if (instructionNode.children().get(0).getSymbol().getValue().toString().equals("<If>")) {
@@ -172,11 +185,79 @@ public class AST {
 			return this.parsePrint(instructionNode.children().get(0));
 		} else if (instructionNode.children().get(0).getSymbol().getValue().toString().equals("<Read>")) {
 			return this.parseRead(instructionNode.children().get(0));
-		} else {
+		} else if (instructionNode.children().get(0).getSymbol().getValue().toString().equals("<FuncCall>")) {
+			return this.parseFuncCall(instructionNode.children().get(0));
+		}else {
 			throw new ASTException("Invalid Instruction: " + instructionNode.children().get(0).getSymbol().getValue().toString());
 		}
 	}
+	private SymbolNode parseFunc(SymbolNode funcNode) throws ASTException {
+		this.checkTypeOfNode(funcNode, null);
+		this.checkValueOfNode(funcNode, "<Func>");
+		if (funcNode.children().size() != 4) {
+			throw new ASTException("Error: <Func> should have exactly 4 children.");
+		}
+		SymbolNode astFuncNode = new SymbolNode(funcNode.children().get(0).getSymbol());
+		astFuncNode.addChild(new SymbolNode(funcNode.children().get(1).getSymbol())); // name of the function
+		SymbolNode astWithNode = new SymbolNode(funcNode.children().get(2).getSymbol());
+		
+		SymbolNode astFuncSyffix = funcNode.children().get(3);
+		while (astFuncSyffix.children().get(0).getSymbol().getType() == LexicalUnit.VARNAME) {
+			astWithNode.addChild(new SymbolNode(astFuncSyffix.children().get(0).getSymbol()));
+			astFuncSyffix = astFuncSyffix.children().get(1);
+		}
+		if (astFuncSyffix.children().get(0).getSymbol().getType() != LexicalUnit.IN ) {
+			throw new ASTException("Error: func should end with a \"in\" and only contain variable names");
+		}
+		astFuncNode.addChild(astWithNode);
+		SymbolNode astInNode = new SymbolNode(astFuncSyffix.children().get(0).getSymbol());
+		int offset = 0;
+		if (astFuncSyffix.children().get(1).getSymbol().getValue().equals("<Code>")) {
+			astInNode.addChild(parseCode(astFuncSyffix.children().get(1)));
+			offset = 1;
+		} 
+		
+		astFuncNode.addChild(astInNode);
+		SymbolNode rtnStmtNode = astFuncSyffix.children().get(1 + offset);
+		offset = 0;
+		if (rtnStmtNode.children().size() == 3) {
+			SymbolNode rtnNode = new SymbolNode(rtnStmtNode.children().get(0).getSymbol());
+			if (rtnStmtNode.children().get(1).getSymbol().getType() == LexicalUnit.STRING) {
+				rtnNode.addChild(rtnStmtNode.children().get(1));
+			} else {
+				rtnNode.addChild(parseExprArith(rtnStmtNode.children().get(1)));
+			}
+			
+			astFuncNode.addChild(rtnNode);
+			offset = 2;
+		} 
+		
+		
+		astFuncNode.addChild(new SymbolNode(rtnStmtNode.children().get(offset).getSymbol()));
+		
+		return astFuncNode;
+	}
+	
+	
+	private SymbolNode parseFuncCall(SymbolNode funcCallNode) throws ASTException {
+		this.checkTypeOfNode(funcCallNode, null);
+		this.checkValueOfNode(funcCallNode, "<FuncCall>");
+		if (funcCallNode.children().size() != 4) {
+			throw new ASTException("Error: <FuncCall> should have exactly 4 children.");
+		}
+		SymbolNode callNode = funcCallNode.children().get(0);
+		callNode.addChild(funcCallNode.children().get(1));
+		SymbolNode argsNode = new SymbolNode(new Symbol(null, "Args"));
+		SymbolNode suffixNode = funcCallNode.children().get(3);
+		while (suffixNode.children().get(0).getSymbol().getType() != LexicalUnit.RPAREN) {
+			argsNode.addChild(parseExprArith(suffixNode.children().get(0)));
+			suffixNode = suffixNode.children().get(1);
+		}
+		callNode.addChild(argsNode);
+		return callNode;
+	}
 
+		
 	private SymbolNode parseAssign(SymbolNode assignNode) throws ASTException {
 		this.checkTypeOfNode(assignNode, null);
 		this.checkValueOfNode(assignNode, "<Assign>");
@@ -187,11 +268,26 @@ public class AST {
 		SymbolNode astAssignNode = new SymbolNode(assignNode.children().get(1).getSymbol());
 
 		astAssignNode.addChild(new SymbolNode(assignNode.children().get(0).getSymbol()));
-		// TODO: mark the used varname as declared.
-
-		astAssignNode.addChild(this.parseExprArith(assignNode.children().get(2)));
+		
+		astAssignNode.addChild(this.parseAssignSuffix(assignNode.children().get(2)));
 		return astAssignNode;
 	}	
+	private SymbolNode parseAssignSuffix(SymbolNode assignSuffixNode) throws ASTException {
+		this.checkTypeOfNode(assignSuffixNode, null);
+		this.checkValueOfNode(assignSuffixNode, "<AssignSuffix>");
+		if (assignSuffixNode.children().size() != 1) {
+			throw new ASTException("Error: <AssignSuffix> should have exactly 1 child.");
+		}
+		SymbolNode child = assignSuffixNode.children().get(0);
+		if (child.getSymbol().getValue().toString().equals("<ExprArith>")) {
+			return this.parseExprArith(child);
+		} else if (child.getSymbol().getValue().toString().equals("<FuncCall>")) {
+			return this.parseFuncCall(child);
+		} else {
+			SymbolNode astAssignNode = new SymbolNode(child.getSymbol());
+			return astAssignNode;
+		}
+	}
 
 	private SymbolNode parseExprArith(SymbolNode exprArithNode) throws ASTException {
 		SymbolNode leftSide = this.parseEA1(exprArithNode.children().get(0));
@@ -326,8 +422,16 @@ public class AST {
 		this.checkValueOfNode(ifNode, "<If>");
 		SymbolNode astIfNode = new SymbolNode(ifNode.children().get(0).getSymbol());
 		astIfNode.addChild(this.parseCond(ifNode.children().get(1))); // condition for first child...
-		astIfNode.addChild(this.parseCode(ifNode.children().get(3))); // if code for second...
-		astIfNode = this.parseIfSuffix(ifNode.children().get(4), astIfNode); // else code for third.
+		
+		int offset = 0;
+		if (ifNode.children().get(3).getSymbol().getValue().equals("<Code>")) {
+			astIfNode.addChild(this.parseCode(ifNode.children().get(3))); // if code for second...
+			offset = 1;
+		} else {
+			astIfNode.addChild(new SymbolNode(new Symbol(null, "<InstList>")));
+		}
+		
+		astIfNode = this.parseIfSuffix(ifNode.children().get(3 + offset), astIfNode); // else code for third.
 		
 		return astIfNode;
 	}
@@ -349,7 +453,10 @@ public class AST {
 		this.checkValueOfNode(whileNode, "<While>");
 		SymbolNode astWhileNode = new SymbolNode(whileNode.children().get(0).getSymbol());
 		astWhileNode.addChild(this.parseCond(whileNode.children().get(1))); // the condition as first child
-		astWhileNode.addChild(this.parseCode(whileNode.children().get(3))); // the code as second child
+		if (whileNode.children().get(3).getSymbol().getValue().equals("<Code>")) { // If the loop isn't empty
+			astWhileNode.addChild(this.parseCode(whileNode.children().get(3))); // the code as second child
+		}
+		
 		return astWhileNode;
 	}
 	private SymbolNode parseFor(SymbolNode forNode) throws ASTException {
@@ -359,24 +466,27 @@ public class AST {
 		astForNode.addChild(forNode.children().get(1)); // varname as first child
 		astForNode.addChild(this.parseExprArith(forNode.children().get(3))); // the "from" as second child
 		astForNode = this.parseForSuffix(forNode.children().get(4), astForNode); // the other childs are add by the parseForSuffix method
-
+		
 		return astForNode;
 	}
 	private SymbolNode parseForSuffix(SymbolNode forSuffixNode, SymbolNode parentForNode) throws ASTException {
 		this.checkTypeOfNode(forSuffixNode, null);
 		this.checkValueOfNode(forSuffixNode, "<ForSuffix>");
 		int offset = 0;
-		if (forSuffixNode.children().size() == 7) { // there's a "by"
+		if (forSuffixNode.children().get(0).getSymbol().getType() == LexicalUnit.BY) {
 			parentForNode.addChild(this.parseExprArith(forSuffixNode.children().get(1)));
 			offset = 2;
-		} else if (forSuffixNode.children().size() == 5) {
-			parentForNode.addChild(new SymbolNode(new Symbol(LexicalUnit.NUMBER, "1"))); // by default by=1
 		} else {
-			System.out.println("That's not the right amount of child for a <ForSuffix> node...");
+			parentForNode.addChild(new SymbolNode(new Symbol(LexicalUnit.NUMBER, "1"))); // by default by=1
 		}
+		
 		parentForNode.addChild(this.parseExprArith(forSuffixNode.children().get(1 + offset))); // the "to" fourth child
-		parentForNode.addChild(this.parseCode(forSuffixNode.children().get(3 + offset))); // the code in the last child
-
+		if (forSuffixNode.children().get(3 + offset).getSymbol().getValue().equals("<Code>")) {
+			parentForNode.addChild(this.parseCode(forSuffixNode.children().get(3 + offset))); // the code in the last child
+		} else {
+			parentForNode.addChild(new SymbolNode(new Symbol(null, "<InstList>")));
+		}
+		
 		return parentForNode;
 	}
 	private SymbolNode parseRead(SymbolNode readNode) throws ASTException {
@@ -386,22 +496,18 @@ public class AST {
 	}
 	private SymbolNode parsePrint(SymbolNode printNode) throws ASTException {
 		SymbolNode astPrintNode = new SymbolNode(printNode.children().get(0).getSymbol());
-		astPrintNode.addChild(new SymbolNode(printNode.children().get(2).getSymbol()));
+		astPrintNode.addChild(parsePrintSuffix(printNode.children().get(2)));
+		
 		return astPrintNode;
 	}
+	private SymbolNode parsePrintSuffix(SymbolNode printNode) throws ASTException {
+		if (printNode.children().get(0).getSymbol().getValue().equals("<ExprArith>")) {
+			return parseExprArith(printNode.children().get(0));
+		} else {
+			return new SymbolNode(printNode.children().get(0).getSymbol());
+		}
+	}
 }
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

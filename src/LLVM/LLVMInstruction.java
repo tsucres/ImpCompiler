@@ -1,5 +1,8 @@
 package LLVM;
 
+
+import java.util.List;
+
 import Utils.StringUtils;
 
 class LLVMInstruction implements LLVMCodeGenerator {
@@ -9,6 +12,7 @@ class LLVMInstruction implements LLVMCodeGenerator {
 	    public final static String SUB = "sub";
 	    public final static String DIV = "sdiv";
 	    public final static String MUL = "mul";
+	    public final static String REM = "srem";
 	}
 	public class ComparisonOperation {
 	    public final static String EQ = "eq";
@@ -61,7 +65,7 @@ class LLVMInstruction implements LLVMCodeGenerator {
  	 * @param condVarName The name of the variable to store the bool result in
  	 * @param lbl1 the name of the group to jump to if condVarName is true
  	 * @param lbl2 the name of the group to jump to if condVarName is false
- 	 * @return
+ 	 * @return the created LLVMInstruction instance
  	 */
  	static public LLVMInstruction createConditionalJump(String condVarName, String lbl1, String lbl2) {
  		String code = "br i1 " + condVarName + " , label %" + lbl1 + " , label %" + lbl2;
@@ -74,7 +78,7 @@ class LLVMInstruction implements LLVMCodeGenerator {
  	 * @param rtnVarname
  	 * @param var1
  	 * @param var2
- 	 * @return
+ 	 * @return the created LLVMInstruction instance
  	 */
  	static public LLVMInstruction createComparison(String op, String rtnVarname, String var1, String var2) {
  		String code = rtnVarname + " = icmp " + op.toString() + " i32 " + var1 + "," + var2;
@@ -86,12 +90,23 @@ class LLVMInstruction implements LLVMCodeGenerator {
  		return new LLVMInstruction(code);
  	}
 
- 	static public LLVMInstruction createPrint(String varname) {
- 		String code = "call void @println(i32 " + varname + ")";
+ 	static public LLVMInstruction createIntPrint(String varname) {
+ 		String code = "call void @printint(i32 " + varname + ")";
  		return new LLVMInstruction(code);
  	}
  	static public LLVMInstruction createRead(String varname) {
  		String code = varname + " = call i32 @readInt()";
+ 		return new LLVMInstruction(code);
+ 	}
+ 	static public LLVMInstruction createIntFuncCall(String rtnVarName, String funcName, List<String> params) {
+ 		String strParams = "";
+ 		for (String strparam : params) {
+ 			strParams += "i32 " + strparam + ", ";
+		}
+ 		if (strParams.length() > 2) {
+ 			strParams = strParams.substring(0, strParams.length()-2);
+ 		}
+ 		String code = rtnVarName + " = call i32 @" + funcName + "(" + strParams + ")";
  		return new LLVMInstruction(code);
  	}
 
@@ -106,8 +121,8 @@ class LLVMInstruction implements LLVMCodeGenerator {
  	}
  	/**
  	 *
- 	 * varname = %a, @a, ...
- 	 * value = 1, %a, @a, ...
+ 	 * varname = %a, {@literal @a}, ...
+ 	 * value = 1, %a, {@literal @a}, ...
  	 */
  	static public LLVMInstruction createIntAssignation(String varname, String value) {
  		String code = "store i32 " + value + ", i32* " + varname;
@@ -118,6 +133,21 @@ class LLVMInstruction implements LLVMCodeGenerator {
  		String code = rtnVarname + " = load i32, i32* " + varname;
  		return new LLVMInstruction(code);
 
+ 	}
+ 	
+ 	static public LLVMInstruction createStringLitteral(String varname, String str, int len) {
+ 		String code = varname + " = internal constant [" + Integer.toString(len) + " x i8] c\"" + str + "\"";
+ 		return new LLVMInstruction(code);
+ 	}
+ 	static public LLVMInstruction createStrPrint(String varname, int len) {
+ 		String strLen = Integer.toString(len);
+ 		String code = "call i32 (i8*, ...) @printf(i8* getelementptr inbounds ([";
+ 		code += strLen + " x i8], [" + strLen + " x i8]* " + varname + ", i32 0, i32 0))";
+ 		return new LLVMInstruction(code);
+ 	}
+ 	static public LLVMInstruction createPrintNewLine() {
+ 		String code = "call i32 (i8*, ...) @printf(i8* getelementptr inbounds ([2 x i8], [2 x i8]* @.strNL, i32 0, i32 0))";
+ 		return new LLVMInstruction(code);
  	}
 
  	static public LLVMInstruction createNot(String rtnVarname, String varname) {
@@ -141,5 +171,8 @@ class LLVMInstruction implements LLVMCodeGenerator {
  	}
  	static public LLVMInstruction createSubstraction(String rtnVarname, String var1, String var2) {
  		return LLVMInstruction.createArthmeticOperation(ArithmeticOperation.SUB, rtnVarname, var1, var2);
+ 	}
+ 	static public LLVMInstruction createRemainer(String rtnVarname, String var1, String var2) {
+ 		return LLVMInstruction.createArthmeticOperation(ArithmeticOperation.REM, rtnVarname, var1, var2);
  	}
  }

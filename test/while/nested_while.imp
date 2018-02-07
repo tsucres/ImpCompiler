@@ -1,0 +1,15 @@
+begin
+  a := 10;
+  b := 5;
+  while a > 0 do
+    a := a - 1;
+    while b > 0 do
+      b := b -1;
+      print(b)
+    done;
+    print(a)
+  done;
+
+  endend := 190009;
+  print(endend)
+end

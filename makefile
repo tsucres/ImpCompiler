@@ -1,4 +1,4 @@
-all: jar, doc
+all: jar doc
 
 jar: build
 	jar cfe dist/Part3.jar Main -C bin .

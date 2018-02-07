@@ -1,0 +1,12 @@
+begin
+  a := 5;
+  
+  if a > 2 then
+  	print(a)
+  else
+    while a > 2 do
+      a := a -1
+    done
+  endif
+
+end

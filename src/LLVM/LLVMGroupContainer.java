@@ -1,6 +1,6 @@
 package LLVM;
 /**
- * This class handles the generation of valid variable & group names.
+ * This class handles the generation of valid variable and group names.
  */
 class LLVMGroupContainer {
 	

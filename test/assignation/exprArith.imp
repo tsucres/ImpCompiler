@@ -1,0 +1,8 @@
+begin
+  a := 10*2;
+  print(a); print("\n");
+  a := 10*2 + 3;
+  print(a); print("\n");
+  a := 10*(2 + 3);
+  print(a); print("\n")
+end

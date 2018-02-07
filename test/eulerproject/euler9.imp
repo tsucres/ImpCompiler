@@ -1,0 +1,47 @@
+func gcd with x y in
+  rtnValue := 0;
+  if y = 0 then
+    rtnValue := x
+  else
+    rtnValue := call gcd(y x%y)
+  endif
+  return rtnValue
+endfunc
+begin
+  rtnValue := 0;
+  s := 1000;
+  sBis := s / 2;
+  mLimit := 23 - 1; (* ceiling(sqrt(sBis))) - 1 *)
+  for m from 2 to mLimit do
+    if sBis % m = 0 then
+      sm := sBis / m;
+      while sm % 2 = 0 do
+        sm := sm / 2
+      done;
+      k := 0;
+      if m % 2 = 1 then 
+        k := m+2 
+      else 
+        k := m+1 
+      endif;
+      while k < 2*m and k <= sm do
+        gcdValue := call gcd(k m);
+        if sm % k = 0 and gcdValue = 1 then
+          d := sBis / (k*m);
+          n := k-m;
+          a := d*(m*m-n*n);
+          b := 2*d*m*n;
+          c := d*(m*m+n*n);
+          rtnValue := a*b*c
+        endif;
+        k := k+2
+      done
+    endif
+
+  done;
+  print("Result: ");
+  print(rtnValue);
+  print("\n");
+
+  print("Expected result: 31875000\n")
+end

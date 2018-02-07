@@ -1,0 +1,7 @@
+func firstFunc with in
+  local := 4;
+  print(local)
+endfunc
+begin
+  call firstFunc()
+end

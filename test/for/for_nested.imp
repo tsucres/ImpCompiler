@@ -1,0 +1,8 @@
+begin
+  for a from 1 by 2 to 10 do
+  	for b from 1 by 2 to 10 do
+      print(a)
+  	done
+  done
+  
+end

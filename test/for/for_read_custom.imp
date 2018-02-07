@@ -1,0 +1,13 @@
+begin
+  start := 0;
+  ended := 0;
+  bay := 0;
+  read(start);
+  read(ended);
+  read(bay);
+  print(bay);
+  for a from start by bay to ended do
+    print(a)
+  done 
+
+end

@@ -1,1 +1,1 @@
-packageSearchIndex = [{"l":"AST"},{"l":"Lexer"},{"l":"LLVM"},{"l":"Parser"},{"l":"TreePrinter"}]
+packageSearchIndex = [{"l":"AST"},{"l":"Lexer"},{"l":"LLVM"},{"l":"Parser"},{"l":"TreePrinter"},{"l":"Utils"}]

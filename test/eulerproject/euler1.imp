@@ -1,0 +1,16 @@
+(*
+Find the sum of all the multiples of 3 or 5 below 1000.
+For example, bellow 10: 3 + 5 + 6 + 9 = 23
+*)
+begin
+  max := 1000;
+  sum := 0; 
+  for i from 0 to max do
+    if i % 3 = 0 or i % 5 = 0 then
+      sum := sum + i
+    endif
+  done;
+  print("Result: ");
+  print(sum);
+  print("\n")
+end
