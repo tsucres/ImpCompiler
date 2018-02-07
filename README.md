@@ -1,7 +1,6 @@
 # ImpCompiler
 
 [![Javadoc](https://img.shields.io/badge/javadoc-OK-orange.svg)](https://tsucres.github.io/ImpCompiler/index.html)
-[![Build Status](https://travis-ci.org/tsucres/ImpCompiler.svg?branch=master)](https://travis-ci.org/tsucres/ImpCompiler)
 
 
 This is a compiler written in Java for a simple imperative language (referred as "Imp"). It supports all the basic features of a programming language, including: 
