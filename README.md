@@ -68,7 +68,7 @@ $ java -jar dist/ImpCompiler.jar
 ## Project structure
 
 - `dist`: contains the .jar
-- `docs`: contains the javadoc
+- `docs`: contains the javadoc (available [here](https://tsucres.github.io/ImpCompiler/index.html))
 - `test`: contains a bunch of imp source codes (valid and syntactically/semantically invalid) used to test the compiler. They're sorted according to the functionalities of the Imp language they implement and to whether they are valid or not.
 - `src`:
 	- The `Lexer` package implements the lexical analyzer. It's mainly composed of the model classes `Symbol` and `LexicalUnit` and of the jflex-generated class `ImpLexer`
